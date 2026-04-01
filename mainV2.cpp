@@ -10,6 +10,7 @@
 
 using namespace std;
 
+const int MAX_NODES = 100;
 struct City{
     int num_nodes;
     vector<vector<int>> adj;
@@ -19,6 +20,9 @@ struct City{
 
     // int powered;
     int minPlants;
+
+    // Bit set 
+    bitset<MAX_NODES> node_masks[MAX_NODES];
 
     // Construction
     // City(int n): num_nodes(n) , adj(n), result(n,'0') , powered(n,false) {}
@@ -143,11 +147,11 @@ struct City{
             return adj[a].size() > adj[b].size();
         });
 
-        cout << "--- Node Processing Order (Degree-based) ---" << endl;
-        for (int node : remaining_order) {
-            cout << "Node: " << node << " | Adjacency Count: " << adj[node].size() << endl;
-        }
-        cout << "--------------------------------------------" << endl;
+        // cout << "--- Node Processing Order (Degree-based) ---" << endl;
+        // for (int node : remaining_order) {
+        //     cout << "Node: " << node << " | Adjacency Count: " << adj[node].size() << endl;
+        // }
+        // cout << "--------------------------------------------" << endl;
 
         order = remaining_order;
         backtrack(current, coverage, 0, pre_planted_count, powered_count);
