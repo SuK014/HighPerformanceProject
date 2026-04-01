@@ -47,20 +47,23 @@ struct City{
     }
 
     // Backtracking
-    void backtrack(string& currentConfig, vector<int>& coverage, int index, int currentCount, int &powered_count, int total_to_process) {
+    void backtrack(string& currentConfig, vector<int>& coverage, int index, int currentCount, int powered_count) {
         // Pruning
         if (currentCount >= minPlants) return;
 
         // Base case
         if (powered_count == num_nodes) {
-            minPlants = currentCount;
-            result = currentConfig;
+           if (currentCount < minPlants) {
+                minPlants = currentCount;
+                result = currentConfig; // Save the winner to the class-level 'result'
+            }
             return;
         }
 
-        if (index == total_to_process) return;
+        if (index == order.size()) return;
 
         int node = order[index];
+
 
         // plant
         int added_coverage = 0;
@@ -74,21 +77,26 @@ struct City{
         }
 
         currentConfig[node] = '1';
-        powered_count += added_coverage;
-        backtrack(currentConfig, coverage, index + 1, currentCount + 1, powered_count,total_to_process);
+        // powered_count += added_coverage;
+        backtrack(currentConfig, coverage, index + 1, currentCount + 1, powered_count + added_coverage);
 
         // no plant
         currentConfig[node] = '0';
-        powered_count -= added_coverage;
-        if (--coverage[node] == 0); 
+        // powered_count -= added_coverage;
+        --coverage[node];
         for (int neighbor : adj[node]) {
             --coverage[neighbor];
         }
+        // if (--coverage[node] == 0) added_coverage--;
+        // for (int neighbor : adj[node]) {
+        //     if (--coverage[neighbor] == 0) added_coverage--;
+        // }
         
-        int temp_powered = 0;
-        for(int i=0; i<num_nodes; i++) if(coverage[i] > 0) temp_powered++;
-        powered_count = temp_powered;
-        backtrack(currentConfig, coverage, index + 1, currentCount, powered_count,total_to_process);
+        // int temp_powered = 0;
+        // for(int i=0; i<num_nodes; i++) if(coverage[i] > 0) temp_powered++;
+        // powered_count = temp_powered;
+        if (coverage[node] != 0) return;
+        backtrack(currentConfig, coverage, index + 1, currentCount, powered_count);
     }
 
     // void solveByGreedy(){
@@ -142,8 +150,7 @@ struct City{
         cout << "--------------------------------------------" << endl;
 
         order = remaining_order;
-        int remaining_nodes = order.size();
-        backtrack(current, coverage, 0, pre_planted_count, powered_count, remaining_nodes);
+        backtrack(current, coverage, 0, pre_planted_count, powered_count);
 
         cout << result << endl;
     }
