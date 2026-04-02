@@ -26,7 +26,7 @@ struct City{
     // int powered;
     int minPlants;
 
-    // Bitset
+    // Bitset (Vectorization)
     bitset<MAX_NODES> node_masks[MAX_NODES];    
 
     // Construction
@@ -40,7 +40,7 @@ struct City{
         adj[v].push_back(u);
     }
 
-    // Pre-calculate the bitmask : insted of for loop the adj every time
+    // Pre-calculate the bitmask : insted of for loop the adj every time (Vectorization)
     void precomputeMasks() {
         for (int i = 0; i < num_nodes; ++i) {
             node_masks[i].reset();
@@ -72,7 +72,7 @@ struct City{
 
         // Choice 1 : Plant
         currentConfig[node] = '1';
-        // Using OR in bitmask (instead of the for loop update coverage)
+        // Using OR in bitmask (instead of the for loop update coverage) (Vectorization)
         backtrack(currentConfig, current_coverage | node_masks[node], index + 1, currentCount + 1);
 
         // Choice 2 : NOT Plant
@@ -104,8 +104,11 @@ struct City{
     void solveByGreedy(){
         // turn adj into coverage bitmask
         precomputeMasks();
+        // check bottleneck
+        // cout << "finish percompute" <<endl;
 
         string current = string(num_nodes, '0');
+        // (Vectorization)
         bitset<MAX_NODES> initial_coverage;
         int pre_planted_count = 0;
         vector<int> remaining_order;
@@ -119,11 +122,13 @@ struct City{
                 remaining_order.push_back(i);
             }
         }
-
+        
         sort(remaining_order.begin(), remaining_order.end(), [&](int a, int b) {
             return adj[a].size() > adj[b].size();
         });
 
+        // check bottleneck
+        // cout << "finish sort" <<endl;
 
         order = remaining_order;
 
@@ -139,6 +144,9 @@ struct City{
             }
             last_chance[i] = latest;
         }
+
+        // check bottleneck
+        // cout << "finish prepare graph" <<endl;
 
         backtrack(current, initial_coverage, 0, pre_planted_count);
 
