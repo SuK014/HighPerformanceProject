@@ -37,7 +37,7 @@ def run_test(file_path):
         print(f"{file_name:<20} | Result: {result_str:<10} | Plants: {min_plants:<3} | Time: {elapsed:.4f}s")
 
     except subprocess.TimeoutExpired:
-        print(f"{file_name:<20} | Result: -1         | Plants: -1  | Time: >10s (TIMEOUT)")
+        print(f"{file_name:<20} | Result: -1         | Plants: -1  | Time: >{TIMEOUT_LIMIT}s (TIMEOUT)")
     except Exception as e:
         print(f"{file_name:<20} | Error: {str(e)}")
 

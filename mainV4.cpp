@@ -51,6 +51,7 @@ struct City{
             for (int neighbor : adj[i]) {
                 node_masks[i].set(neighbor); // Power neighbor
             }
+            
         }
     }
     
@@ -122,28 +123,43 @@ struct City{
         int pre_planted_count = 0;
         vector<int> remaining_order;
 
+        
         for (int i = 0; i < num_nodes; i++) {
-            auto adjacent = adj[i];
-            if (adj[i].empty() && !initial_coverage.test(i)) {
+            if (adj[i].empty()) {
                 current[i] = '1';
-                initial_coverage |= node_masks[i]; 
+                initial_coverage.set(i);
                 pre_planted_count++;
-            }
-            else if (adj[i].size() == 1 && !initial_coverage.test(i)) {
-                int neighbor = adj[i][0];
-                if (current[neighbor] != '1') { 
-                    current[neighbor] = '1';
-                    initial_coverage |= node_masks[neighbor]; 
-                    pre_planted_count++;
-                }
-            }
-        }
-
-        for (int i = 0; i < num_nodes; i++) {
-            if (!initial_coverage.test(i)) {
+            } else {
                 remaining_order.push_back(i);
             }
         }
+        
+        sort(remaining_order.begin(), remaining_order.end(), [&](int a, int b) {
+            return adj[a].size() > adj[b].size();
+        });
+
+        // for (int i = 0; i < num_nodes; i++) {
+        //     auto adjacent = adj[i];
+        //     if (adj[i].empty() && !initial_coverage.test(i)) {
+        //         current[i] = '1';
+        //         initial_coverage |= node_masks[i]; 
+        //         pre_planted_count++;
+        //     }
+        //     else if (adj[i].size() == 1 && !initial_coverage.test(i)) {
+        //         int neighbor = adj[i][0];
+        //         if (current[neighbor] != '1') { 
+        //             current[neighbor] = '1';
+        //             initial_coverage |= node_masks[neighbor]; 
+        //             pre_planted_count++;
+        //         }
+        //     }
+        // }
+
+        // for (int i = 0; i < num_nodes; i++) {
+        //     if (!initial_coverage.test(i)) {
+        //         remaining_order.push_back(i);
+        //     }
+        // }
         
         sort(remaining_order.begin(), remaining_order.end(), [&](int a, int b) {
             return adj[a].size() > adj[b].size();
