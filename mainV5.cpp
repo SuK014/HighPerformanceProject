@@ -356,8 +356,8 @@ struct City{
 
 int main(int argc, char* argv[]) {
     // WARNING : Usage 
-    if (argc < 2) {
-        cerr << "Usage: " << argv[0] << " <input_file>" << endl;
+    if (argc < 3) {
+        cerr << "Usage: " << argv[0] << " <input_file> <output_file>" << endl;
         return 1;
     }
     
@@ -376,7 +376,7 @@ int main(int argc, char* argv[]) {
     infile >> n >> e;
     City city(n);
     // Declare edges connection
-    vector<vector<int>> adj(n);
+    // vector<vector<int>> adj(n);
     
      
     for (int i = 0; i < e; ++i) {
@@ -398,6 +398,16 @@ int main(int argc, char* argv[]) {
     chrono::duration<double> diff = end_time - start_time;
 
     cerr << "Execution time: " << diff.count() << " seconds" << endl;
+
+    // Write in output file
+    ofstream outfile(argv[2]);
+    if (!outfile) {
+        cerr << "Could not open output file: " << argv[2] << endl;
+        return 1;
+    }
+
+    outfile << city.result << "\n"; 
+    outfile.close();
 
     return 0;
 }

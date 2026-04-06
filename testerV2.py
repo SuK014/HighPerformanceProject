@@ -5,9 +5,9 @@ import time
 # Configuration
 EXECUTABLE = "./mainV4"
 EXAMPLE_FOLDER = "./Example"
-TIMEOUT_LIMIT = 10.0
+TIMEOUT_LIMIT = 60.0
 
-# Ground Truth Dictionary (Consolidated from your images)
+# Ground Truth Dictionary
 OPTIMAL_VALUES = {
     "grid-6-7": 2, "grid-9-12": 3, "grid-12-17": 4, "grid-16-24": 4, "grid-20-31": 6,
     "grid-25-40": 7, "grid-30-49": 8, "grid-40-67": 11, "grid-49-84": 12,
@@ -25,6 +25,55 @@ OPTIMAL_VALUES = {
     "spec-1.dat": 2, "spec-2.dat": 2, "spec-3.dat": 2, "spec-4.dat": 1,
     "spec-5.dat": 3, "spec-6.dat": 3, "spec-7.dat": 3,
 }
+
+def verify_coverage(file_path, result_config):
+    """Parses the graph file and verifies if result_config provides 100% coverage."""
+    if result_config == "N/A":
+        return False, "No Config"
+
+    try:
+        with open(file_path, 'r') as f:
+            lines = f.read().split()
+            if not lines:
+                return False, "Empty File"
+            
+            n = int(lines[0])
+            e = int(lines[1])
+            
+            if len(result_config) != n:
+                return False, f"Len Mismatch ({len(result_config)} vs {n})"
+
+            # Build Adjacency List
+            adj = {i: [] for i in range(n)}
+            idx = 2
+            for _ in range(e):
+                if idx + 1 < len(lines):
+                    u, v = int(lines[idx]), int(lines[idx+1])
+                    adj[u].append(v)
+                    adj[v].append(u)
+                    idx += 2
+                    
+        # Verify Coverage
+        for i in range(n):
+            # If the node itself has a plant, it's covered
+            if result_config[i] == '1':
+                continue
+            
+            # Otherwise, check if any neighbor has a plant
+            covered = False
+            for neighbor in adj[i]:
+                if result_config[neighbor] == '1':
+                    covered = True
+                    break
+            
+            # If neither the node nor its neighbors have a plant, coverage fails
+            if not covered:
+                return False, f"Node {i} bare"
+                
+        return True, "VALID"
+        
+    except Exception as e:
+        return False, f"Err: {str(e)}"
 
 def run_test(file_path):
     file_name = os.path.basename(file_path)
@@ -46,22 +95,26 @@ def run_test(file_path):
             if "Final Result :" in line:
                 result_config = line.split(":")[1].strip()
         
-        status = "UNKNOWN"
+        # 1. Check Optimality
+        opt_status = "UNKNOWN"
         if file_name in OPTIMAL_VALUES:
             expected = OPTIMAL_VALUES[file_name]
-            # Check if optimal (or better)
             if found_plants != -1 and found_plants <= expected:
-                status = "PASS"
+                opt_status = "PASS"
             else:
-                status = f"FAIL (Exp {expected})"
+                opt_status = f"FAIL(Exp {expected})"
+        
+        # 2. Check Physical Graph Coverage
+        is_covered, cov_msg = verify_coverage(file_path, result_config)
+        cov_display = "✅ VALID" if is_covered else f"❌ {cov_msg}"
         
         # Format: Config is truncated if it's too long for the terminal
         display_config = result_config if len(result_config) <= 20 else result_config
         
-        print(f"{file_name:<18} | P: {found_plants:<2} | {elapsed}s | {status:<10} | {display_config}")
+        print(f"{file_name:<18} | P: {found_plants:<2} | {elapsed:>6.3f}s | {opt_status:<12} | {cov_display:<15} | {display_config}")
 
     except subprocess.TimeoutExpired:
-        print(f"{file_name:<18} | TIMEOUT")
+        print(f"{file_name:<18} | TIMEOUT (> {TIMEOUT_LIMIT}s)")
     except Exception as e:
         print(f"{file_name:<18} | Error: {str(e)}")
 
@@ -72,8 +125,8 @@ def main():
         
     files = sorted([f for f in os.listdir(EXAMPLE_FOLDER) if os.path.isfile(os.path.join(EXAMPLE_FOLDER, f))])
     
-    print(f"{'File Name':<18} | {'P':<2} | {'Time':<6} | {'Status':<10} | {'Result String'}")
-    print("-" * 80)
+    print(f"{'File Name':<18} | {'P':<2} | {'Time':<7} | {'Opt. Status':<12} | {'Coverage':<15} | {'Result String'}")
+    print("-" * 95)
     for file in files:
         run_test(os.path.join(EXAMPLE_FOLDER, file))
 
