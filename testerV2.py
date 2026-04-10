@@ -3,9 +3,9 @@ import subprocess
 import time
 
 # Configuration
-EXECUTABLE = "./mainV4"
+EXECUTABLE = "./mainV5"
 EXAMPLE_FOLDER = "./Example"
-TIMEOUT_LIMIT = 60.0
+TIMEOUT_LIMIT = 10.0
 
 # Ground Truth Dictionary
 OPTIMAL_VALUES = {

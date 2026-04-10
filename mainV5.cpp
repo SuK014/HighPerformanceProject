@@ -84,7 +84,7 @@ struct City{
             if (num_nodes - powered_count > max_possible_new_coverage) return;
         }
         // Base case
-        if (current_coverage.all() || current_coverage.count() == (size_t)num_nodes) {
+        if ((int)current_coverage.count() == num_nodes) {
             // Due to using thread this make it not write at the same time
             lock_guard<mutex> lock(mtx);
             if (currentCount < minPlants) {
@@ -131,6 +131,26 @@ struct City{
 
 
     }
+    void forceLeaves(bitset<MAX_NODES>& current, bitset<MAX_NODES>& coverage, int& count) {
+        bool changed = true;
+        while (changed) {
+            changed = false;
+            for (int i = 0; i < num_nodes; i++) {
+                // If leaf and not yet covered
+                if (adj[i].size() == 1 && !coverage.test(i)) {
+                    int parent = adj[i][0];
+                    if (!current.test(parent)) {
+                        current.set(parent);
+                        coverage |= node_masks[parent];
+                        count++;
+                        changed = true;
+                    }
+                }
+            }
+        }
+    }
+
+    
 
 
     void solveByGreedy(){
@@ -151,13 +171,31 @@ struct City{
         vector<int> remaining_order;
 
         
+        // for (int i = 0; i < num_nodes; i++) {
+        //     if (adj[i].empty()) {
+        //         // current[i] = '1';
+        //         current.set(i);
+        //         initial_coverage.set(i);
+        //         pre_planted_count++;
+        //     } else {
+        //         remaining_order.push_back(i);
+        //     }
+        // }
+        // NEW
         for (int i = 0; i < num_nodes; i++) {
             if (adj[i].empty()) {
-                // current[i] = '1';
                 current.set(i);
                 initial_coverage.set(i);
                 pre_planted_count++;
-            } else {
+            }
+        }
+
+        // Force plant parents of all leaves
+        forceLeaves(current, initial_coverage, pre_planted_count);
+
+        // Only backtrack on nodes not yet decided
+        for (int i = 0; i < num_nodes; i++) {
+            if (!adj[i].empty() && !current.test(i)) {
                 remaining_order.push_back(i);
             }
         }
@@ -166,33 +204,46 @@ struct City{
             return adj[a].size() > adj[b].size();
         });
 
-        // for (int i = 0; i < num_nodes; i++) {
-        //     auto adjacent = adj[i];
-        //     if (adj[i].empty() && !initial_coverage.test(i)) {
-        //         current[i] = '1';
-        //         initial_coverage |= node_masks[i]; 
-        //         pre_planted_count++;
-        //     }
-        //     else if (adj[i].size() == 1 && !initial_coverage.test(i)) {
-        //         int neighbor = adj[i][0];
-        //         if (current[neighbor] != '1') { 
-        //             current[neighbor] = '1';
-        //             initial_coverage |= node_masks[neighbor]; 
-        //             pre_planted_count++;
-        //         }
-        //     }
-        // }
-
-        // for (int i = 0; i < num_nodes; i++) {
-        //     if (!initial_coverage.test(i)) {
-        //         remaining_order.push_back(i);
-        //     }
-        // }
-        
-      
         // check bottleneck
         cout << "finish sort" <<endl;
 
+        // Upper bound
+        bitset<MAX_NODES> greedy_cov = initial_coverage;
+        bitset<MAX_NODES> greedy_planted = current;
+        int greedy_count = pre_planted_count;
+
+        while (greedy_cov.count() < (size_t)num_nodes) {
+            int best = -1, best_gain = 0;
+            for (int node : remaining_order) {
+                if (greedy_planted.test(node)) continue;
+                int gain = (node_masks[node] & ~greedy_cov).count();
+                if (gain > best_gain) {
+                    best_gain = gain;
+                    best = node;
+                }
+            }
+            if (best == -1) break;
+            greedy_planted.set(best);
+            greedy_cov |= node_masks[best];
+            greedy_count++;
+        }
+
+        minPlants = greedy_count;
+        result = string(num_nodes, '0');
+        for (int i = 0; i < num_nodes; i++)
+            if (greedy_planted.test(i)) result[i] = '1';
+        // if (initial_coverage.count() == (size_t)num_nodes) {
+        //     result = string(num_nodes, '0');
+        //     for (int i = 0; i < num_nodes; i++)
+        //         if (current.test(i)) result[i] = '1';
+        //     minPlants = pre_planted_count;
+        //     cout << "Final Result : " << result << endl;
+        //     return;
+        // }
+
+        // minPlants = pre_planted_count + (int)remaining_order.size();
+      
+        
         order = remaining_order;
 
         vector<int> pos_in_order(num_nodes, -1);
@@ -203,7 +254,10 @@ struct City{
         for (int i = 0; i < num_nodes; i++) {
             int latest = pos_in_order[i]; 
             for (int neighbor : adj[i]) {
-                latest = max(latest, pos_in_order[neighbor]);
+                // latest = max(latest, pos_in_order[neighbor]);
+                int npos = pos_in_order[neighbor];
+                if (npos != -1)  // only consider undecided neighbors
+                    latest = max(latest, npos);
             }
             last_chance[i] = latest;
         }
@@ -234,8 +288,8 @@ struct City{
             return; // Exit early, no need for threads!
         }
 
-        // Separate in to 4 Thread Version
-        int depth = min(8, (int)order.size());
+        // Separate in to 8 Thread Version
+        int depth = min(3, (int)order.size());
         int num_tasks = 1 << depth;
         vector<future<void>> tasks;
 
@@ -271,81 +325,10 @@ struct City{
                 }
             }));
         }
-        // int node0 = order[0];
-        // int node1 = order[1];
-
-        // vector<future<void>> tasks;
-
-        // // Plant both
-        // tasks.push_back(async(launch::async, [this, current, initial_coverage, pre_planted_count, node0, node1]() mutable {
-        //     // current[node0] = '1';
-        //     // current[node1] = '1';
-        //     current.set(node0); 
-        //     current.set(node1);
-        //     auto cov = initial_coverage | node_masks[node0] | node_masks[node1];
-        //     this->backtrack(current, cov, 2, pre_planted_count + 2, (int)cov.count());
-        // }));
-        // // Plant only first one
-        // tasks.push_back(async(launch::async, [this, current, initial_coverage, pre_planted_count, node0, node1]() mutable {
-        //     // current[node0] = '1';
-        //     // current[node1] = '0';
-        //     current.set(node0); 
-        //     current.reset(node1);
-        //     auto cov = initial_coverage | node_masks[node0];
-        //     // Safe check for node1
-        //     if (cov.test(node1) || 1 < last_chance[node1]) {
-        //         this->backtrack(current, cov, 2, pre_planted_count + 1, (int)cov.count());
-        //     }
-        // }));
-        // // Plant only second one
-        // tasks.push_back(async(launch::async, [this, current, initial_coverage, pre_planted_count, node0, node1]() mutable {
-        //     // current[node0] = '0';
-        //     // current[node1] = '1';
-        //     current.reset(node0); 
-        //     current.set(node1);
-        //     auto cov = initial_coverage | node_masks[node1];
-        //     // Safe check for node0
-        //     if (initial_coverage.test(node0) || 0 < last_chance[node0]) {
-        //         this->backtrack(current, cov, 2, pre_planted_count + 1, (int)cov.count());
-        //     }
-        // }));
-        // // Not Plant neither
-        // tasks.push_back(async(launch::async, [this, current, initial_coverage, pre_planted_count, node0, node1]() mutable {
-        //     // current[node0] = '0';
-        //     // current[node1] = '0';
-        //     current.reset(node0); 
-        //     current.reset(node1);
-        //     // Safe check for both
-        //     bool safe0 = initial_coverage.test(node0) || 0 < last_chance[node0];
-        //     bool safe1 = initial_coverage.test(node1) || 1 < last_chance[node1];
-        //     if (safe0 && safe1) {
-        //         this->backtrack(current, initial_coverage, 2, pre_planted_count, (int)initial_coverage.count());
-        //     }
-        // }));
 
         for (auto &t : tasks) {
             t.get();
         }
-
-        // Separate in to 2 Thread Version
-        // string config1 = current; 
-        // config1[order[0]] = '1';
-
-        // // Launch Choice 1 (Plant) in a background thread
-        // auto f1 = std::async(std::launch::async, [this, config1, initial_coverage, pre_planted_count]() mutable {
-        //     auto next_cov = initial_coverage | node_masks[order[0]];
-        //     // Inside this thread, we call backtrack with a REFERENCE to our local config1
-        //     this->backtrack(config1, next_cov, 1, pre_planted_count + 1, (int)next_cov.count());
-        // });        
-
-        // // Choice 2 (No Plant)
-        // string config2 = current; 
-        // config2[order[0]] = '0';
-        // if (initial_coverage.test(order[0]) || 0 < last_chance[order[0]]) {
-        //     backtrack(config2, initial_coverage, 1, pre_planted_count, (int)initial_coverage.count());
-        // }
-
-        // f1.get();
 
         cout << "Final Result : " << result << endl;
     }
@@ -356,7 +339,7 @@ struct City{
 
 int main(int argc, char* argv[]) {
     // WARNING : Usage 
-    if (argc < 3) {
+    if (argc < 2) {
         cerr << "Usage: " << argv[0] << " <input_file> <output_file>" << endl;
         return 1;
     }
@@ -375,10 +358,9 @@ int main(int argc, char* argv[]) {
     int n, e;
     infile >> n >> e;
     City city(n);
+
+
     // Declare edges connection
-    // vector<vector<int>> adj(n);
-    
-     
     for (int i = 0; i < e; ++i) {
         int u, v;
         infile >> u >> v;
@@ -400,14 +382,13 @@ int main(int argc, char* argv[]) {
     cerr << "Execution time: " << diff.count() << " seconds" << endl;
 
     // Write in output file
-    ofstream outfile(argv[2]);
-    if (!outfile) {
-        cerr << "Could not open output file: " << argv[2] << endl;
-        return 1;
+    if (argc >= 3) {
+        ofstream outfile(argv[2]);
+        outfile << city.result << "\n";
+        outfile.close();
     }
 
-    outfile << city.result << "\n"; 
-    outfile.close();
+    cout << "RESULT:" << city.result << "\n";
 
     return 0;
 }
